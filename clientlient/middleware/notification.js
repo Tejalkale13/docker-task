@@ -3,15 +3,15 @@ const db = require("../models/index");
 // const nodemailer = require("nodemailer");
 // const fs = require("fs/promises");
 // const path = require("path");
-const admin = require("firebase-admin");
-const serviceAccount = require("../Data/edbition-lms-b0f71-firebase-adminsdk-hzabu-5d5f277d81.json");
-const SibApiV3Sdk = require("sib-api-v3-sdk");
+// const admin = require("firebase-admin");
+// const serviceAccount = require("../Data/edbition-lms-b0f71-firebase-adminsdk-hzabu-5d5f277d81.json");
+// const SibApiV3Sdk = require("sib-api-v3-sdk");
 
 // Configure API key authorization
-let defaultClient = SibApiV3Sdk.ApiClient.instance;
-let apiKey = defaultClient.authentications["api-key"];
-apiKey.apiKey =
-  "";
+// let defaultClient = SibApiV3Sdk.ApiClient.instance;
+// let apiKey = defaultClient.authentications["api-key"];
+// apiKey.apiKey =
+//   "";
 // AWS.config.update({ region: process.env.SQS_REGION });
 // var sqs = new AWS.SQS({ apiVersion: process.env.SQS_API_VERSION });
 require("dotenv").config();
@@ -26,9 +26,9 @@ require("dotenv").config();
 // });
 
 //Configuration for push notification
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+// admin.initializeApp({
+//   credential: admin.credential.cert(serviceAccount),
+// });
 
 // Function to send email notification
 async function sendEmailAsNotification(req, res, next) {
