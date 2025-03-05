@@ -1,0 +1,27 @@
+version: '3.9'
+services:
+  service1:
+    build:
+      context: ./admin
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+  service2:
+    build:
+      context: ./client-steaming
+    ports:
+      - "3001:3001"
+    environment:
+      - NODE_ENV=production
+  service3:
+    build:
+      context: ./clientlient
+    ports:
+      - "3002:3002"
+    environment:
+      - NODE_ENV=production
+networks:
+  default:
+    driver: bridge
+
