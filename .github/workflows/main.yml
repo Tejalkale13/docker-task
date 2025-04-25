@@ -1,0 +1,92 @@
+name: Deploy to ECS
+
+on:
+  push:
+    branches:
+      - master
+
+env:
+  REPOSITORY_URL: <REPOSITORY_URL> # 123456789012.dkr.ecr.us-east-1.amazonaws.com/todo-app
+  TASK_DEFINITION_NAME: <TASK_DEFINITION_NAME>
+  CLUSTER_NAME: <CLUSTER_NAME>
+  SERVICE_NAME: <SERVICE_NAME>
+  AWS_REGION: <AWS_REGION> # e.g., us-east-1
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v3
+
+    - name: Set up Docker
+      uses: docker/setup-buildx-action@v2
+
+    - name: Configure AWS credentials
+      uses: aws-actions/configure-aws-credentials@v2
+      with:
+        aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+        aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+        aws-region: ${{ env.AWS_REGION }}
+
+    - name: Login to Amazon ECR
+      id: login-ecr
+      uses: aws-actions/amazon-ecr-login@v1
+
+    - name: Extract short commit SHA
+      id: vars
+      run: echo "IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-8)" >> $GITHUB_ENV
+
+    - name: Build Docker image
+      run: |
+        docker build -t $REPOSITORY_URL:latest .
+        docker tag $REPOSITORY_URL:latest $REPOSITORY_URL:$IMAGE_TAG
+
+    - name: Push Docker image
+      run: |
+        docker push $REPOSITORY_URL:$IMAGE_TAG
+
+    - name: Install dependencies
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y jq
+
+    - name: Describe current task definition
+      id: taskdef
+      run: |
+        aws ecs describe-task-definition \
+          --task-definition $TASK_DEFINITION_NAME \
+          --region $AWS_REGION > taskdef.json
+
+    - name: Prepare updated container definitions
+      run: |
+        CONTAINER_DEFINITIONS=$(jq --arg IMAGE "$REPOSITORY_URL:$IMAGE_TAG" \
+          '.taskDefinition.containerDefinitions | map(.image = $IMAGE)' taskdef.json)
+        echo "$CONTAINER_DEFINITIONS" > container_definitions.json
+
+    - name: Register new task definition revision
+      run: |
+        FAMILY=$(jq -r '.taskDefinition.family' taskdef.json)
+        EXEC_ROLE=$(jq -r '.taskDefinition.executionRoleArn' taskdef.json)
+        NETWORK_MODE=$(jq -r '.taskDefinition.networkMode' taskdef.json)
+        COMPATIBILITY=$(jq -r '.taskDefinition.requiresCompatibilities[0]' taskdef.json)
+        CPU=$(jq -r '.taskDefinition.cpu' taskdef.json)
+        MEMORY=$(jq -r '.taskDefinition.memory' taskdef.json)
+
+        aws ecs register-task-definition \
+          --family "$FAMILY" \
+          --execution-role-arn "$EXEC_ROLE" \
+          --network-mode "$NETWORK_MODE" \
+          --requires-compatibilities "$COMPATIBILITY" \
+          --cpu "$CPU" \
+          --memory "$MEMORY" \
+          --container-definitions file://container_definitions.json
+
+    - name: Update ECS service
+      run: |
+        aws ecs update-service \
+          --cluster "$CLUSTER_NAME" \
+          --service "$SERVICE_NAME" \
+          --task-definition "$TASK_DEFINITION_NAME" \
+          --region "$AWS_REGION"
